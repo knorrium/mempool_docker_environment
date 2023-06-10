@@ -1,0 +1,84 @@
+version: '3.9'
+services:
+
+  electrs:
+    build:
+      context: .
+      dockerfile: Dockerfile.electrs
+      args:
+        ELECTRS_VERSION: 0.9.14
+    environment:
+      ELECTRS_DAEMON_RPC_ADDR: bitcoind:28444
+      ELECTRS_DAEMON_P2P_ADDR: bitcoind:28445
+      ELECTRS_ELECTRUM_RPC_ADDR: electrs:60001
+      ELECTRS_MONITORING_ADDR: electrs:25225
+      ELECTRS_NETWORK: "regtest"
+      ELECTRS_DB_DIR: "/data"
+      ELECTRS_LOG_FILTERS: "DEBUG"
+    entrypoint:
+      /electrs/target/release/electrs
+    command:
+      --conf /data/electrs.toml
+    volumes:
+    - './electrs.toml:/data/electrs.toml'
+    - 'electrs_data:/data'
+    restart: on-failure
+    depends_on: 
+      - bitcoind
+    expose:
+      - '24224'
+      - '60001'
+    ports:
+      - '25225:25225'
+      - '60001:60001'
+
+  bitcoind:
+    build:
+      context: .
+      dockerfile: Dockerfile.bitcoind
+      args:
+        BITCOIND_VERSION: "25.0"
+    entrypoint:
+      /build/bitcoin/bitcoind
+    command:
+      - -printtoconsole 
+      - -regtest 
+      - -server 
+      - -txindex=1 
+      - -rpcallowip=0.0.0.0/0
+      - -port=28445
+      - -rpcbind=0.0.0.0:28444
+      - -rpcport=28444
+      - -rpcauth=mempool:566ace4b8835ffc2b6afe62bc9572f46$$71289034ea88f6a9e78af51c5b2f2501a2f3c3b47e9cdcfca773353d61996734
+      - -datadir=/bitcoind_data
+    volumes:
+      - ./bitcoind_data:/bitcoind_data
+    expose:
+      - '28444'
+      - '28445'
+    ports:
+      - '28444:28444'
+      - '28445:28445'
+
+  db:
+    environment:
+      MYSQL_DATABASE: "mempool"
+      MYSQL_USER: "mempool"
+      MYSQL_PASSWORD: "mempool"
+      MYSQL_ROOT_PASSWORD: "admin"
+    image: mariadb:10.5.8
+    user: "1000:1000"
+    restart: on-failure
+    stop_grace_period: 1m
+    volumes:
+      - ./mysql_data:/var/lib/mysql
+    expose:
+      - '3306'
+    ports:
+      - '13306:3306'
+
+networks: {}
+
+volumes:
+  bitcoind_data:
+  electrs_data:
